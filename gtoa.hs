@@ -7,7 +7,7 @@
 
 import System.IO
 import Data.List
-import qualified Data.Text as Text
+import qualified Data.Text as T
 
 
 
@@ -27,8 +27,8 @@ data Node = Node
 
 data Edge a = Edge
     {
-      source :: Node,
-      target :: Node,
+      source :: Int,   -- uid of a Node object
+      target :: Int,
       weight :: a
     } deriving (Show)
 
@@ -44,11 +44,29 @@ type Graph = GeneralGraph Float
 
 -- Some basic utilities to work with graphs
 
+-- |Returns the list of Nodes
 nodes :: GeneralGraph a -> [Node]
 nodes (Graph ns _) = ns
 
+
+-- |Returns the list of Edges
 edges :: GeneralGraph a -> [Edge a]
 edges (Graph _ es) = es
+
+
+
+---- Text helper functions
+
+-- Some additions to Data.Text
+
+
+-- |Deletes all occurrences of a Char from a Text.
+deleteOccurrences :: T.Text -> Char -> T.Text
+deleteOccurrences text del = T.filter (/=del) text
+
+-- |Deletes all occurrences of every Char in <chars>
+deleteAll :: T.Text -> String -> T.Text
+deleteAll text chars = T.foldl deleteOccurrences text (T.pack chars)
 
 
 
@@ -58,8 +76,9 @@ edges (Graph _ es) = es
 -- data.p For example, they strip away comments, unnecessary whitespace, etc.
 
 
-parseGML :: Text.Text -> Text.Text
-parseGML contents = Text.strip $ (Text.splitOn (Text.pack "graph") contents) !! 1
+-- |Parser for GML format.
+parseGML :: T.Text -> T.Text
+parseGML contents = T.strip $ ((T.splitOn (T.pack "graph") contents) !! 1)
 
 
 
@@ -69,48 +88,50 @@ parseGML contents = Text.strip $ (Text.splitOn (Text.pack "graph") contents) !! 
 -- and output a value of type Graph.
 
 
-convertGML :: Text.Text -> Graph
-convertGML text = makeGraph $ map convertNodeGML $ splitIntoNodesGML text
+-- |Builds a graph from a file. -- <text> should be the output of parseGML
+convertGML :: T.Text -> Graph
+convertGML text = Graph (map convertNodeGML $ splitIntoNodesGML text) (map convertEdgeGML $ splitIntoEdgesGML text)
 
 
-splitIntoNodesGML :: Text.Text -> [Text.Text]
-splitIntoNodesGML text = map cleanNodeGML $ tail $ Text.splitOn (Text.pack "node") text
+-- |Splits text into chunks on every occurrence of <str>.
+splitIntoChunkGML :: String -> T.Text -> [T.Text]
+splitIntoChunkGML str text = map cleanChunkGML $ tail $ T.splitOn (T.pack str) text
 
 
-cleanNodeGML :: Text.Text -> Text.Text
-cleanNodeGML text = Text.strip $ Text.unlines $ map cleanLine (Text.lines text)
-    where
-      cleanLine line = Text.strip $ Text.foldl deleteAll line (Text.pack "[]")
+-- |Aliases for splitting into nodes and egdes
+splitIntoNodesGML = splitIntoChunkGML "node"
+splitIntoEdgesGML = splitIntoChunkGML "edge"
 
 
-deleteAll :: Text.Text -> Char -> Text.Text
-deleteAll text del = Text.filter (/=del) text
+-- |Cleans up a chunk: removes some undesired chars and whitespace.
+cleanChunkGML :: T.Text -> T.Text
+cleanChunkGML text = T.strip . T.unlines . map T.strip $ T.lines (deleteAll text "[]")
 
-                         
-convertNodeGML :: Text.Text -> Node
+-- |Gets a chunk of cleaned up text and returns a Node
+convertNodeGML :: T.Text -> Node
 convertNodeGML text = Node {uid=uid, label=lbl}
     where
-      strings = Text.lines text
-      uid = read (Text.unpack $ Text.drop 3 (head strings)) :: Int
-      lbl = Text.unpack $ deleteAll (Text.drop 6 $ last strings) '"'
+      strings = T.lines text
+      uid = read (T.unpack $ T.drop 3 (head strings)) :: Int
+      lbl = T.unpack $ deleteOccurrences (T.drop 6 $ last strings) '"'
 
 
-
----- Graph building functions
-
-
-makeGraph :: [Node] -> Graph
-makeGraph nodes = Graph nodes []
+-- |Gets a chunk of cleaned up text and returns an Edge
+convertEdgeGML :: T.Text -> Edge Float
+convertEdgeGML text = Edge {source=src, target=tgt, weight=val}
+    where
+      strings = T.lines text
+      src = read (T.unpack $ T.drop 7 (strings !! 0)) :: Int
+      tgt = read (T.unpack $ T.drop 7 (strings !! 1)) :: Int
+      val = read (T.unpack $ T.drop 6 (strings !! 2)) :: Float
 
 
 
 ---- convert function
 
--- This function receives the whole content of a file and just dispatches the right
--- converter function.
-
-
-convert :: Text.Text -> Graph
+-- |This function receives the whole content of a file and just dispatches the right
+-- specialized converter function.
+convert :: T.Text -> Graph
 convert contents = convertGML $ parseGML contents
 
 
@@ -124,6 +145,6 @@ main = do
   handle <- openFile "celegansneural.gml" ReadMode
   contents <- hGetContents handle
 
-  putStrLn $ show $ convert $ Text.pack contents
+  putStrLn $ show $ convert $ T.pack contents
 
   hClose handle
