@@ -132,8 +132,8 @@ convertEdgeGML text = Edge {source=src, target=tgt, weight=val}
 
 -- |This function receives the whole content of a file and just dispatches the right
 -- specialized converter function.
-convert :: T.Text -> Graph
-convert contents = convertGML $ parseGML contents
+toGraph :: T.Text -> Graph
+toGraph contents = convertGML $ parseGML contents
 
 
 
@@ -184,7 +184,7 @@ main = do
   inHandle <- openFile filename ReadMode
   contents <- hGetContents inHandle
            
-  let math = T.unpack $ toMath $ convert $ T.pack contents
+  let math = T.unpack $ toMath $ toGraph $ T.pack contents
 
   outHandle <- openFile outfilename WriteMode
   hPutStrLn outHandle math
