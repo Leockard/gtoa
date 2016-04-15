@@ -1,5 +1,5 @@
 -- gtoa.hs
--- Utility to convert between different grahp file formats
+-- Utility to convert between different graph file formats
 
 -- Thanks to lazy evaluation, we can read huge files and process them without taking all
 -- available memory.
@@ -27,8 +27,8 @@ data Node = Node
 
 data Edge a = Edge
     {
-      source :: Int,   -- uid of a Node object
-      target :: Int,
+      source :: Int,   -- ^ uid of a Node object
+      target :: Int,   -- ^ uid of a Node object
       weight :: a
     } deriving (Show)
 
@@ -127,7 +127,7 @@ convertEdgeGML text = Edge {source=src, target=tgt, weight=val}
 
 
 
----- convert function
+---- General-purpose convert function
 
 -- |This function receives the whole content of a file and just dispatches the right
 -- specialized converter function.
@@ -136,15 +136,53 @@ convert contents = convertGML $ parseGML contents
 
 
 
+---- Convert to Mathematica Graph[] format.
+
+-- |Receives a Graph value and outputs a Text with a valid Mathematica representation of
+-- the same graph.
+toMath :: Graph -> T.Text
+toMath (Graph ns es) = T.concat [T.pack "Graph[",
+                                 mathNodes ns,
+                                 T.pack ", ",
+                                 mathEdges es,
+                                 T.pack ", VertexLabels -> ",
+                                 mathLabelRules ns,
+                                 T.pack "]"
+                                ]
+
+
+-- |Receives a list of Nodes and outputs a valid Mathematica representation.
+mathNodes :: [Node] -> T.Text
+mathNodes ns = T.pack $ "{" ++ nodes ++ "}" where
+    nodes = intercalate ", " $ map (show . uid) ns
+    
+
+-- |Receives a list of Edges and outputs a valid Mathematica representation.
+mathEdges :: [Edge a] -> T.Text
+mathEdges es = T.pack $ "{" ++ edges ++ "}" where
+    edges = intercalate ", " $ map edgeAsStr es
+    edgeAsStr e = "DirectedEdge[" ++ (show $ source e) ++ ", " ++ (show $ target e) ++ "]"
+
+
+-- |Receives a list of Nodes and outputs a list of Mathematica rules assigning them their
+-- respective labels.
+mathLabelRules :: [Node] -> T.Text
+mathLabelRules ns = T.pack $ "{" ++ labels ++ "}" where
+    labels = intercalate ", " $ map labelRule ns
+    labelRule n = show (uid n) ++ " -> " ++ show (label n)
+
+
+
 ---- Main
-
--- Read data and format types from command line
-
   
 main = do
-  handle <- openFile "celegansneural.gml" ReadMode
-  contents <- hGetContents handle
+  inHandle <- openFile "celegansneural.gml" ReadMode
+  contents <- hGetContents inHandle
+           
+  let math = T.unpack $ toMath $ convert $ T.pack contents
 
-  putStrLn $ show $ convert $ T.pack contents
+  outHandle <- openFile "celegansneural.m" WriteMode
+  hPutStrLn outHandle math
 
-  hClose handle
+  hClose outHandle
+  hClose inHandle
