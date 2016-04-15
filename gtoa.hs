@@ -177,9 +177,9 @@ mathLabelRules ns = T.pack $ "{" ++ labels ++ "}" where
 ---- Main
   
 main = do
-  args <- getArgs  
+  args <- getArgs
   let filename = head args
-  let outfilename = (T.unpack $ head $ T.splitOn (T.pack ".") (T.pack filename)) ++ ".m"
+  let outfilename = fst (span (/='.') filename) ++ ".m"
 
   inHandle <- openFile filename ReadMode
   contents <- hGetContents inHandle
