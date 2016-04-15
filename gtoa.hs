@@ -6,6 +6,7 @@
 
 
 import System.IO
+import System.Environment
 import Data.List
 import qualified Data.Text as T
 
@@ -176,12 +177,16 @@ mathLabelRules ns = T.pack $ "{" ++ labels ++ "}" where
 ---- Main
   
 main = do
-  inHandle <- openFile "celegansneural.gml" ReadMode
+  args <- getArgs  
+  let filename = head args
+  let outfilename = (T.unpack $ head $ T.splitOn (T.pack ".") (T.pack filename)) ++ ".m"
+
+  inHandle <- openFile filename ReadMode
   contents <- hGetContents inHandle
            
   let math = T.unpack $ toMath $ convert $ T.pack contents
 
-  outHandle <- openFile "celegansneural.m" WriteMode
+  outHandle <- openFile outfilename WriteMode
   hPutStrLn outHandle math
 
   hClose outHandle
